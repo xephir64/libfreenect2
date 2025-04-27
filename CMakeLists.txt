@@ -1,5 +1,6 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 4.0)
 
+include(CheckLanguage)
 SET(PROJECT_VER_MAJOR 0)
 SET(PROJECT_VER_MINOR 2)
 SET(PROJECT_VER_PATCH 0)
@@ -337,62 +338,15 @@ IF(ENABLE_OPENCL)
   ENDIF(OpenCL_FOUND)
 ENDIF(ENABLE_OPENCL)
 
-SET(HAVE_CUDA disabled)
-IF(ENABLE_CUDA)
-  FIND_PACKAGE(CUDA)
-  SET(HAVE_CUDA no)
-  IF(CUDA_FOUND AND MSVC14 AND CUDA_VERSION VERSION_LESS 8.0)
-    SET(HAVE_CUDA "no (VS2015 not supported)")
-  ELSEIF(CUDA_FOUND)
+check_language(CUDA)
+if(CMAKE_CUDA_COMPILER)
     SET(LIBFREENECT2_WITH_CUDA_SUPPORT 1)
     SET(HAVE_CUDA yes)
-
-    STRING(REPLACE "\\" "/" NVCUDASAMPLES_ROOT "$ENV{NVCUDASAMPLES_ROOT}")
-    STRING(REPLACE "\\" "/" NVCUDASAMPLES8_0_ROOT "$ENV{NVCUDASAMPLES8_0_ROOT}")
-    CUDA_INCLUDE_DIRECTORIES(
-      "${MY_DIR}/include/"
-      "${CUDA_TOOLKIT_ROOT_DIR}/samples/common/inc"
-      "${NVCUDASAMPLES_ROOT}/common/inc"
-      "${NVCUDASAMPLES8_0_ROOT}/common/inc"
-    )
-    SET(CUDA_FLAGS -use_fast_math)
-    IF(NOT MSVC)
-      SET(CUDA_FLAGS "${CUDA_FLAGS} -Xcompiler -fPIC")
-    ENDIF()
-    IF(HAVE_CXX11 STREQUAL yes AND CUDA_VERSION VERSION_GREATER 7.0)
-      SET(CUDA_FLAGS "${CUDA_FLAGS} -std=c++11")
-    ENDIF()
-
-    SET(OLD_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-    STRING(REGEX REPLACE "-std=c\\+\\+.." "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-    CUDA_COMPILE(CUDA_OBJECTS
-      src/cuda_depth_packet_processor.cu
-      src/cuda_kde_depth_packet_processor.cu
-      OPTIONS ${CUDA_FLAGS}
-    )
-    SET(CMAKE_CXX_FLAGS "${OLD_CMAKE_CXX_FLAGS}")
-
-    INCLUDE_DIRECTORIES(${CUDA_INCLUDE_DIRS})
-
-    LIST(APPEND SOURCES
-      ${CUDA_OBJECTS}
-    )
-
-    LIST(APPEND LIBRARIES
-      ${CUDA_LIBRARIES}
-    )
-  ENDIF()
-ENDIF(ENABLE_CUDA)
-
-# RPATH handling for CUDA 8.0 libOpenCL.so conflict. See #804.
-IF(HAVE_OpenCL STREQUAL yes AND UNIX AND NOT APPLE)
-  FILE(GLOB CUDA_ld_so_conf /etc/ld.so.conf.d/cuda*.conf)
-  IF(CUDA_ld_so_conf)
-    MESSAGE(WARNING "Your CUDA installation overrides OpenCL system library path.")
-    GET_FILENAME_COMPONENT(OpenCL_LIB_PATH ${OpenCL_LIBRARY} DIRECTORY)
-    SET(CMAKE_INSTALL_RPATH ${OpenCL_LIB_PATH} CACHE STRING "Set RPATH for system OpenCL")
-  ENDIF()
-ENDIF()
+    message(STATUS "CUDA detected")
+else()
+    SET(HAVE_CUDA no)
+    message(STATUS "No CUDA support")
+endif()
 
 # RPATH handling for private libusb copies
 # Users have two options:
